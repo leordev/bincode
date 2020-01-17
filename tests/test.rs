@@ -714,3 +714,61 @@ fn test_varint_length_prefixes() {
     the_same(c);
     the_same(d);
 }
+
+#[cfg(feature = "varint")]
+#[test]
+fn test_eos_serialization() {
+    #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+    pub struct Checksum256 {
+        pub value: [u8; 32],
+    }
+
+    #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+    pub struct BlockPosition {
+        pub block_num: u32,
+        pub block_id: Checksum256,
+    }
+
+    #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+    pub struct GetStatusRequestV0;
+
+    #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+    pub struct GetBlocksRequestV0 {
+        pub start_block_num: u32,
+        pub end_block_num: u32,
+        pub max_messages_in_flight: u32,
+        pub have_positions: Vec<BlockPosition>,
+        pub irreversible_only: bool,
+        pub fetch_block: bool,
+        pub fetch_traces: bool,
+        pub fetch_deltas: bool,
+    }
+
+    #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+    pub enum Requests {
+        GetStatus(GetStatusRequestV0),
+        GetBlocksRequest(GetBlocksRequestV0),
+    }
+
+    let status_request = Requests::GetStatus(GetStatusRequestV0 {});
+    assert_eq!(serialize(&status_request).unwrap(), [0]);
+
+    let blocks_request = Requests::GetBlocksRequest(GetBlocksRequestV0 {
+        start_block_num: 10,
+        end_block_num: 13,
+        max_messages_in_flight: 4294967295,
+        have_positions: vec![BlockPosition {
+            block_num: 321956,
+            block_id: Checksum256 {
+                value: [9; 32],
+            }
+        }],
+        irreversible_only: false,
+        fetch_block: true,
+        fetch_traces: true,
+        fetch_deltas: true,
+    });
+    assert_eq!(serialize(&blocks_request).unwrap(),
+    vec![1, 10, 0, 0, 0, 13, 0, 0, 0, 255, 255, 255, 255, 1, 164, 233, 4, 0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0, 1, 1, 1]
+    );
+}
